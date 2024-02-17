@@ -1,30 +1,33 @@
 #include "const.hpp"
-#include "SDL_handler.hpp"
+#include "Game.hpp"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_log.h>
 #include <SDL2/SDL_video.h>
 
-SDL_Window* SDL_handler::m_window = NULL;
-SDL_Renderer* SDL_handler::m_renderer = NULL;
+SDL_Window* Game::m_window = NULL;
+SDL_Renderer* Game::m_renderer = NULL;
+SDL_Event Game::m_event;
+bool Game::m_isRunning = false;
 
-SDL_handler& SDL_handler::getInstance() {
-  static SDL_handler instance;
+Game& Game::getInstance() {
+  static Game instance;
   return instance;
 }
 
-SDL_handler::SDL_handler() {
+Game::Game() {
   m_window = NULL;
   m_renderer = NULL;
+  m_isRunning = false;
   init();
 }
 
-SDL_handler::~SDL_handler() {
+Game::~Game() {
   SDL_DestroyRenderer(m_renderer);
   SDL_DestroyWindow(m_window);
   SDL_Quit();
 }
 
-int SDL_handler::init() {
+int Game::init() {
   int ret = 0;
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL initialization failed: %s",
@@ -39,7 +42,8 @@ int SDL_handler::init() {
                    SDL_GetError());
       SDL_Quit();
       ret = 1;
-    } else {
+    } 
+    else {
       m_renderer = SDL_CreateRenderer(m_window, -1, SDL_RENDERER_ACCELERATED);
       if (!m_renderer) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
@@ -48,12 +52,15 @@ int SDL_handler::init() {
         SDL_Quit();
         ret = 1;
       }
+      else {
+        m_isRunning = true;
+      }
     }
   }
   return ret;
 }
 
-void SDL_handler::drawChessBoard() {
+void Game::drawChessBoard() {
 
   bool isLight = true;
   SDL_Rect square;
@@ -77,9 +84,28 @@ void SDL_handler::drawChessBoard() {
   }
 }
 
-void SDL_handler::renderChessBoard() {
+void Game::render() {
   SDL_SetRenderDrawColor(m_renderer, 255, 255, 255, 255);
   SDL_RenderClear(m_renderer);
   drawChessBoard();
   SDL_RenderPresent(m_renderer);
+}
+
+void Game::handleEvents() {
+  SDL_WaitEvent(&m_event);
+  switch (m_event.type) {
+  case SDL_QUIT:
+    m_isRunning = false;
+    break;
+  default:
+    break;
+  }
+}
+
+void Game::update() {
+  // Nothing to update
+}
+
+bool Game::isRunning() {
+  return m_isRunning;
 }

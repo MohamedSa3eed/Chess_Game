@@ -4,10 +4,12 @@ project(Chess)
 
 set(CMAKE_CXX_STANDARD 14)
 
+find_package(SDL2 REQUIRED)
+
 include_directories(src)
 
 set(SOURCE_FILES src/main.cpp
-                 src/SDL_handler.cpp
+                 src/Game.cpp
   )
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
