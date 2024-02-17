@@ -4,7 +4,11 @@ project(Chess)
 
 set(CMAKE_CXX_STANDARD 14)
 
-set(SOURCE_FILES src/main.cpp)
+include_directories(src)
+
+set(SOURCE_FILES src/main.cpp
+                 src/SDL_handler.cpp
+  )
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
