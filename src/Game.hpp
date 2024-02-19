@@ -1,11 +1,12 @@
-#ifndef GAME_HPP
-#define GAME_HPP
+#pragma once
 
 #include <SDL2/SDL.h>
 
 class Game
 {
   public: 
+    static SDL_Renderer* renderer;
+
     static Game& getInstance(void);
     static void render(void);
     static void handleEvents(void);
@@ -17,7 +18,6 @@ class Game
   private:
     static bool m_isRunning;
     static SDL_Window* m_window;
-    static SDL_Renderer* m_renderer;
     static SDL_Event m_event;
 
     Game(void);
@@ -25,5 +25,3 @@ class Game
     int init(void);
     static void drawChessBoard(void);
 };
-
-#endif
