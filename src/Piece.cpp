@@ -2,12 +2,9 @@
 #include "Game.hpp"
 #include "Piece.hpp"
 
-Piece::Piece(std::string texturePath, bool color) 
-    : m_texturePath(texturePath), m_color(color) {
+Piece::Piece(bool color) 
+    : m_color(color) {
   m_isAlive = true;
-  SDL_Surface *loadedSurface = IMG_Load(texturePath.c_str());
-  m_texture = SDL_CreateTextureFromSurface(Game::getInstance().renderer, loadedSurface);
-  SDL_FreeSurface(loadedSurface);
 }
 
 void Piece::spawn(int x, int y) {

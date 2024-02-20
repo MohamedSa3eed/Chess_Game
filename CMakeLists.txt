@@ -13,6 +13,11 @@ set(SOURCE_FILES src/main.cpp
                  src/Game.cpp
                  src/Piece.cpp
                  src/King.cpp
+                 src/Queen.cpp
+                 src/Bishop.cpp
+                 src/Knight.cpp
+                 src/Rook.cpp
+                 src/Pawn.cpp
   )
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})

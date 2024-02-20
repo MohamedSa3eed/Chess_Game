@@ -6,7 +6,7 @@
 
 class Piece {
   public:
-    Piece(std::string texturePath,bool color);
+    Piece(bool color);
     ~Piece();
     void spawn(int x, int y);
 
