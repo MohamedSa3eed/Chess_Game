@@ -1,11 +1,15 @@
 #pragma once
 
 #include <SDL2/SDL.h>
+#include <map>
+
+#include "Piece.hpp"
 
 class Game
 {
   public: 
     static SDL_Renderer* renderer;
+    static std::map<std::pair<int, int>, Piece*> board;
 
     static Game& getInstance(void);
     static void render(void);
