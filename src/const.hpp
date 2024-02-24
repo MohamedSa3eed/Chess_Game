@@ -72,5 +72,7 @@ const std::pair<int, int> BLACK_RIGHT_ROOK_POSITION = {7, 0};
 
 const bool WHITE = true;
 const bool BLACK = false;
+const int RIGHT = 1;
+const int LEFT = 2;
 
 #endif

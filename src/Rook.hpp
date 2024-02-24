@@ -4,7 +4,7 @@
 
 class Rook : public Piece {
   public:
-    Rook(bool color);
+    Rook(bool color, int position);
     ~Rook();
 
   private:

@@ -8,7 +8,11 @@ class Piece {
   public:
     Piece(bool color);
     ~Piece();
-    void spawn(int x, int y);
+    void spawn(void);
+    int getX(void);
+    int getY(void);
+    void setX(int x);
+    void setY(int y);
 
   protected:
     bool m_isAlive;
