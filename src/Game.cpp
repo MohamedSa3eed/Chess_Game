@@ -2,16 +2,17 @@
 #include <map>
 
 #include "Game.hpp"
+#include "Graphics.hpp"
 #include "const.hpp"
 #include "Piece.hpp"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_log.h>
 #include <SDL2/SDL_video.h>
 
-SDL_Window *Game::m_window = NULL;
-SDL_Renderer *Game::renderer = NULL;
 SDL_Event Game::m_event;
 bool Game::m_isRunning = false;
+bool Game::turn = WHITE;
+Piece* Game::draggingPiece = nullptr;
 // Chessboard
 // 0,0  1,0  2,0  3,0  4,0  5,0  6,0  7,0
 //
@@ -47,91 +48,46 @@ std::map<std::pair<int, int>, Piece *> Game::board = {
     {{7, 4}, nullptr}, {{7, 5}, nullptr}, {{7, 6}, nullptr}, {{7, 7}, nullptr},
 };
 
-Game &Game::getInstance() {
-  static Game instance;
-  return instance;
-}
+bool Game::init() {
+  m_isRunning = true;
 
-Game::Game() {
-  m_window = NULL;
-  renderer = NULL;
-  m_isRunning = false;
-  init();
-}
-
-Game::~Game() {
-  SDL_DestroyRenderer(renderer);
-  SDL_DestroyWindow(m_window);
-  SDL_Quit();
-}
-
-int Game::init() {
-  int ret = 0;
-  if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL initialization failed: %s",
-                 SDL_GetError());
-    ret = 1;
-  } else {
-    m_window = SDL_CreateWindow("Chess Game", SDL_WINDOWPOS_UNDEFINED,
-                                SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH,
-                                WINDOW_HIGHT, SDL_WINDOW_SHOWN);
-    if (!m_window) {
-      SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Window creation failed: %s",
-                   SDL_GetError());
-      SDL_Quit();
-      ret = 1;
-    }
-    else {
-      renderer = SDL_CreateRenderer(m_window, -1, SDL_RENDERER_ACCELERATED);
-      if (!renderer) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "Renderer creation failed: %s", SDL_GetError());
-        SDL_DestroyWindow(m_window);
-        SDL_Quit();
-        ret = 1;
-      }
-      else {
-        m_isRunning = true;
-      }
-    }
+  if (!Graphics::init()) {
+    m_isRunning = false;
+    return false;
   }
-  return ret;
-}
 
-void Game::drawChessBoard() {
+  auto placePiece = [&](Piece *piece) {
+    board[{piece->body.x/SQUARE_SIZE, piece->body.y/SQUARE_SIZE}] = piece;
+  };
 
-  bool isLight = true;
-  SDL_Rect square;
+  placePiece(new King(WHITE));
+  placePiece(new King(BLACK));
+  placePiece(new Queen(WHITE));
+  placePiece(new Queen(BLACK));
+  placePiece(new Bishop(WHITE, LEFT));
+  placePiece(new Bishop(WHITE, RIGHT));
+  placePiece(new Bishop(BLACK, LEFT));
+  placePiece(new Bishop(BLACK, RIGHT));
+  placePiece(new Knight(WHITE, LEFT));
+  placePiece(new Knight(WHITE, RIGHT));
+  placePiece(new Knight(BLACK, LEFT));
+  placePiece(new Knight(BLACK, RIGHT));
+  placePiece(new Rook(WHITE, LEFT));
+  placePiece(new Rook(WHITE, RIGHT));
+  placePiece(new Rook(BLACK, LEFT));
+  placePiece(new Rook(BLACK, RIGHT));
 
   for (int i = 0; i < CHESSBOARD_SIZE; ++i) {
-    for (int j = 0; j < CHESSBOARD_SIZE; ++j) {
-      square.x = j * SQUARE_SIZE;
-      square.y = i * SQUARE_SIZE;
-      square.w = SQUARE_SIZE;
-      square.h = SQUARE_SIZE;
-
-      SDL_SetRenderDrawColor(renderer, isLight ? lightColor.r : darkColor.r,
-                             isLight ? lightColor.g : darkColor.g,
-                             isLight ? lightColor.b : darkColor.b,
-                             isLight ? lightColor.a : darkColor.a);
-
-      SDL_RenderFillRect(renderer, &square);
-      isLight = !isLight;
-    }
-    isLight = !isLight;
+    placePiece(new Pawn(WHITE, i));
+    placePiece(new Pawn(BLACK, i));
   }
-}
 
-void Game::render() {
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-  SDL_RenderClear(renderer);
-  Game::getInstance().drawChessBoard();
+  return true;
 }
 
 void Game::handleEvents() {
-  static int offsetX, offsetY;
   static int oldX, oldY;
-  static int XPos, YPos;
+  static int offsetX, offsetY;
   static bool isDragging = false;
   static Piece *piece = nullptr;
   SDL_WaitEvent(&m_event);
@@ -139,46 +95,57 @@ void Game::handleEvents() {
   case SDL_QUIT:
     m_isRunning = false;
     break;
-  case SDL_MOUSEBUTTONDOWN :
+  case SDL_MOUSEBUTTONDOWN:
     if (m_event.button.button == SDL_BUTTON_LEFT) {
-        int mouseX, mouseY;
-        SDL_GetMouseState(&mouseX, &mouseY);
-        piece = board[{mouseX/SQUARE_SIZE, mouseY/SQUARE_SIZE}];
-        if (piece) {
-          XPos = mouseX;
-          YPos = mouseY;
-          oldX = XPos/SQUARE_SIZE;
-          oldY = YPos/SQUARE_SIZE;
-          std::cout << "here" << std::endl;
-          std::cout << "XPos: " << XPos << " YPos: " << YPos << std::endl;
-          std::cout << "mouseX: " << mouseX << " mouseY: " << mouseY << std::endl;
-          std::cout << "pieceX: " << piece->getX() << " pieceY: " << piece->getY() << std::endl;
+      int mouseX, mouseY;
+      SDL_GetMouseState(&mouseX, &mouseY);
+      int boardX = mouseX / SQUARE_SIZE;
+      int boardY = mouseY / SQUARE_SIZE;
+      if (boardX >= 0 && boardX < CHESSBOARD_SIZE && boardY >= 0 && boardY < CHESSBOARD_SIZE) {
+        piece = board[{boardX, boardY}];
+        if (piece && piece->getColor() == turn) {
+          board[{boardX, boardY}] = nullptr;
+          oldX = boardX;
+          oldY = boardY;
+          offsetX = mouseX - piece->body.x;
+          offsetY = mouseY - piece->body.y;
           isDragging = true;
-          std::cout << "isDragging" << std::endl;
+          draggingPiece = piece;
         }
+      }
     }
     break;
-  case SDL_MOUSEBUTTONUP :
-    if (m_event.button.button == SDL_BUTTON_LEFT) {
-        isDragging = false;
-        if (piece) {
-          XPos /= SQUARE_SIZE;
-          YPos /= SQUARE_SIZE;
-          std::cout << "XPos: " << XPos << " YPos: " << YPos << std::endl;
-          piece->setX(XPos);
-          piece->setY(YPos);
-          board[{oldX, oldY}] = nullptr;
-          std::cout << "mouse up" << std::endl;
-        }
+  case SDL_MOUSEBUTTONUP:
+    if (m_event.button.button == SDL_BUTTON_LEFT && isDragging && piece) {
+      int mouseX, mouseY;
+      SDL_GetMouseState(&mouseX, &mouseY);
+      int newX = mouseX / SQUARE_SIZE;
+      int newY = mouseY / SQUARE_SIZE;
+      if (newX >= 0 && newX < CHESSBOARD_SIZE && newY >= 0 && newY < CHESSBOARD_SIZE) {
+        // TODO Add move validation here (e.g., isValidMove(piece, oldX, oldY, newX, newY))
+        Piece *target = board[{newX, newY}];
+        if (target) delete target;  // Handle capture
+        board[{newX, newY}] = piece;
+        piece->body.x = newX * SQUARE_SIZE;
+        piece->body.y = newY * SQUARE_SIZE;
+        toggleTurn();
+      } else {
+        // Invalid drop: return to original position
+        board[{oldX, oldY}] = piece;
+        piece->body.x = oldX * SQUARE_SIZE;
+        piece->body.y = oldY * SQUARE_SIZE;
+      }
+      isDragging = false;
+      piece = nullptr;
+      draggingPiece = nullptr;
     }
     break;
-  case SDL_MOUSEMOTION :
-    if (isDragging) {
-      SDL_GetMouseState(&XPos, &YPos);
-      //piece->freeSpawn(XPos, YPos);
-      //piece->setX(XPos);
-      //piece->setY(YPos);
-      std::cout << "mouse motion" << std::endl;
+  case SDL_MOUSEMOTION:
+    if (isDragging && piece) {
+      int mouseX, mouseY;
+      SDL_GetMouseState(&mouseX, &mouseY);
+      piece->body.x = mouseX - offsetX;
+      piece->body.y = mouseY - offsetY;
     }
     break;
   default:
@@ -187,9 +154,30 @@ void Game::handleEvents() {
 }
 
 void Game::update() {
-  SDL_RenderPresent(renderer);
+  Graphics::clear();
+  Graphics::drawChessBoard();
+  for (const auto& entry : board) {
+    if (entry.second != nullptr) {
+      Graphics::drawPiece(*entry.second);
+    }
+  }
+  if (draggingPiece) {
+    Graphics::drawPiece(*draggingPiece);
+  }
+  Graphics::present();
 }
 
 bool Game::isRunning() { 
-  return Game::getInstance().m_isRunning;
+  return m_isRunning;
+}
+
+void Game::shutdown() {
+  for (const auto& entry : board) {
+    delete entry.second;
+  }
+  Graphics::cleanup();
+}
+
+void Game::toggleTurn() {
+  Game::turn = (Game::turn == WHITE) ? BLACK : WHITE;
 }

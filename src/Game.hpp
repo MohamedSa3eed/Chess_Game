@@ -8,24 +8,23 @@
 class Game
 {
   public: 
-    static SDL_Renderer* renderer;
     static std::map<std::pair<int, int>, Piece*> board;
 
-    static Game& getInstance(void);
-    static void render(void);
+    static bool init(void);
+    static void shutdown(void);
     static void handleEvents(void);
     static void update(void);
     static bool isRunning(void);
     Game(Game const&) = delete;
     void operator=(Game const&) = delete;
+    
+    Game(void) = default;
+    ~Game(void) = default;
 
   private:
+    static void toggleTurn(void);
     static bool m_isRunning;
-    static SDL_Window* m_window;
     static SDL_Event m_event;
-
-    Game(void);
-    ~Game(void);
-    int init(void);
-    static void drawChessBoard(void);
+    static bool turn;
+    static Piece* draggingPiece;
 };
