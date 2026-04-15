@@ -7,22 +7,24 @@
 class Piece {
   public:
 
-    Piece(bool color);
-    ~Piece();
-    void spawn(int x, int y);
-    //virtual  void move(int x, int y) = 0;
-    bool getColor(void);
     std::string texturePath;
     SDL_Texture* texture;
     SDL_Rect body;
+
+    Piece() = default;
+    Piece(bool color);
+    virtual ~Piece();
+
+    void spawn(int x, int y);
+    void move(int x, int y);
+    virtual bool isValidMove(int x, int y) = 0;
+    bool getColor(void);
 
   protected:
     bool m_isAlive;
     bool m_color;
     int m_xPos;
     int m_yPos;
-
-    //virtual bool isLegalMove(int x, int y) = 0;
 
   private:
 
@@ -31,7 +33,9 @@ class Piece {
 class King : public Piece {
   public:
     King(bool color);
-    ~King();
+    ~King() = default;
+
+    bool isValidMove(int x, int y) override;
 
   private:
 
@@ -40,7 +44,9 @@ class King : public Piece {
 class Queen : public Piece {
   public:
     Queen(bool color);
-    ~Queen();
+    ~Queen() = default;
+
+    bool isValidMove(int x, int y) override;
 
   private:
 
@@ -49,7 +55,9 @@ class Queen : public Piece {
 class Knight : public Piece {
 public:
     Knight(bool color, int position);
-    ~Knight();
+    ~Knight() = default;
+
+    bool isValidMove(int x, int y) override;
 
   private:
 
@@ -58,7 +66,9 @@ public:
 class Bishop : public Piece {
   public:
     Bishop(bool color, int position);
-    ~Bishop();
+    ~Bishop() = default;
+
+    bool isValidMove(int x, int y) override;
 
   private:
 
@@ -67,7 +77,9 @@ class Bishop : public Piece {
 class Rook : public Piece {
   public:
     Rook(bool color, int position);
-    ~Rook();
+    ~Rook() = default;
+
+    bool isValidMove(int x, int y) override;
 
   private:
 
@@ -76,7 +88,9 @@ class Rook : public Piece {
 class Pawn : public Piece {
   public:
     Pawn(bool color, int id);
-    ~Pawn();
+    ~Pawn() = default;
+
+    bool isValidMove(int x, int y) override;
 
   private:
 

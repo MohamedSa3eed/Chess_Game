@@ -1,4 +1,3 @@
-#include <iostream>
 #include <map>
 
 #include "Game.hpp"
@@ -121,19 +120,27 @@ void Game::handleEvents() {
       SDL_GetMouseState(&mouseX, &mouseY);
       int newX = mouseX / SQUARE_SIZE;
       int newY = mouseY / SQUARE_SIZE;
-      if (newX >= 0 && newX < CHESSBOARD_SIZE && newY >= 0 && newY < CHESSBOARD_SIZE) {
+      if (newX >= 0 && newX < CHESSBOARD_SIZE && newY >= 0 && newY < CHESSBOARD_SIZE && piece->isValidMove(newX, newY)) {
         // TODO Add move validation here (e.g., isValidMove(piece, oldX, oldY, newX, newY))
         Piece *target = board[{newX, newY}];
-        if (target) delete target;  // Handle capture
+        if (target && (target->getColor() != piece->getColor())) 
+          delete target;
+        else if (target) {
+          // Invalid move: return to original position
+          board[{oldX, oldY}] = piece;
+          piece->move(oldX, oldY);
+          isDragging = false;
+          piece = nullptr;
+          draggingPiece = nullptr;
+          break;
+        }
         board[{newX, newY}] = piece;
-        piece->body.x = newX * SQUARE_SIZE;
-        piece->body.y = newY * SQUARE_SIZE;
+        piece->move(newX, newY);
         toggleTurn();
       } else {
         // Invalid drop: return to original position
         board[{oldX, oldY}] = piece;
-        piece->body.x = oldX * SQUARE_SIZE;
-        piece->body.y = oldY * SQUARE_SIZE;
+        piece->move(oldX, oldY);
       }
       isDragging = false;
       piece = nullptr;
@@ -144,8 +151,7 @@ void Game::handleEvents() {
     if (isDragging && piece) {
       int mouseX, mouseY;
       SDL_GetMouseState(&mouseX, &mouseY);
-      piece->body.x = mouseX - offsetX;
-      piece->body.y = mouseY - offsetY;
+      piece->spawn(mouseX - offsetX, mouseY - offsetY);
     }
     break;
   default:
@@ -165,6 +171,7 @@ void Game::update() {
     Graphics::drawPiece(*draggingPiece);
   }
   Graphics::present();
+  handleEvents();
 }
 
 bool Game::isRunning() { 

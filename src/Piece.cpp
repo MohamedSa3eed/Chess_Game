@@ -17,6 +17,17 @@ bool Piece::getColor(void) {
   return m_color;
 }
 
+void Piece::spawn(int x, int y) {
+    body.x = x;
+    body.y = y;
+}
+
+void Piece::move(int x, int y) {
+    m_xPos = x;
+    m_yPos = y;
+    spawn(x*SQUARE_SIZE, y*SQUARE_SIZE);
+}
+
 // #########################################################
 
 King::King(bool color) : Piece(color) {
@@ -37,9 +48,12 @@ King::King(bool color) : Piece(color) {
   }
 }
 
-King::~King() {
-
+bool King::isValidMove(int x, int y) {
+  int dx = std::abs(x - m_xPos);
+  int dy = std::abs(y - m_yPos);
+  return (dx <= 1 && dy <= 1) && !(dx == 0 && dy == 0);
 }
+
 // ##########################################################
 
 Queen::Queen(bool color) : Piece(color) {
@@ -60,9 +74,12 @@ Queen::Queen(bool color) : Piece(color) {
   }
 }
 
-Queen::~Queen() {
-
+bool Queen::isValidMove(int x, int y) {
+  int dx = std::abs(x - m_xPos);
+  int dy = std::abs(y - m_yPos);
+  return (dx == dy || dx == 0 || dy == 0) && !(dx == 0 && dy == 0);
 }
+
 // ##########################################################
 
 Knight::Knight(bool color, int position) : Piece(color) {
@@ -95,9 +112,12 @@ Knight::Knight(bool color, int position) : Piece(color) {
   }
 }
 
-Knight::~Knight() {
-
+bool Knight::isValidMove(int x, int y) {
+  int dx = std::abs(x - m_xPos);
+  int dy = std::abs(y - m_yPos);
+  return (dx == 2 && dy == 1) || (dx == 1 && dy == 2);
 }
+
 // ##########################################################
 
 Bishop::Bishop(bool color, int position) : Piece(color) {
@@ -130,9 +150,12 @@ Bishop::Bishop(bool color, int position) : Piece(color) {
   }
 }
 
-Bishop::~Bishop() {
-
+bool Bishop::isValidMove(int x, int y) {
+  int dx = std::abs(x - m_xPos);
+  int dy = std::abs(y - m_yPos);
+  return dx == dy && dx != 0;
 }
+
 // ##########################################################
 Rook::Rook(bool color, int position) : Piece(color) {
   if (color == WHITE) {
@@ -164,9 +187,12 @@ Rook::Rook(bool color, int position) : Piece(color) {
   }
 }
 
-Rook::~Rook() {
-
+bool Rook::isValidMove(int x, int y) {
+  int dx = std::abs(x - m_xPos);
+  int dy = std::abs(y - m_yPos);
+  return (dx == 0 && dy != 0) || (dx != 0 && dy == 0);
 }
+
 // ##########################################################
 
 Pawn::Pawn(bool color, int id) : Piece(color) {
@@ -187,6 +213,13 @@ Pawn::Pawn(bool color, int id) : Piece(color) {
   }
 }
 
-Pawn::~Pawn() {
-
+bool Pawn::isValidMove(int x, int y) {
+  int dx = std::abs(x - m_xPos);
+  int dy = y - m_yPos; // Pawns move forward, so we check the direction
+  if (m_color == WHITE) {
+    return (dx == 0 && dy == -1) || (dx == 0 && dy == -2 && m_yPos == 6) || (dx == 1 && dy == -1); // Move forward or capture
+  } else {
+    return (dx == 0 && dy == 1) || (dx == 0 && dy == 2 && m_yPos == 1) || (dx == 1 && dy == 1); // Move forward or capture
+  }
 }
+
