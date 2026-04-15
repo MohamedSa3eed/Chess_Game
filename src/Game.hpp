@@ -35,10 +35,15 @@ class Game
     static SDL_Event m_event;
     static bool turn;
     static Piece* draggingPiece;
+    static std::pair<int, int> whiteKingPos;
+    static std::pair<int, int> blackKingPos;
 
     static void toggleTurn(void);
     static void handleEvents(void);
     static void undoLastMove(void);
     static bool isPathClear(int fromX, int fromY, int toX, int toY);
     static bool isLegalMove(Piece* piece, int fromX, int fromY, int toX, int toY);
+    static bool isSquareUnderAttack(int x, int y, bool byColor);
+    static bool wouldLeaveKingInCheck(Piece* piece, int fromX, int fromY, int toX, int toY);
+    static std::pair<int, int> getKingPosition(bool color);
 };

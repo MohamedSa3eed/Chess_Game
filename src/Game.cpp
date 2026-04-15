@@ -16,6 +16,8 @@ bool Game::turn = WHITE;
 Piece* Game::draggingPiece = nullptr;
 std::vector<std::pair<int,int>> Game::highlightedMoves;
 std::vector<Game::MoveRecord> Game::moveHistory;
+std::pair<int, int> Game::whiteKingPos = {4, 7};
+std::pair<int, int> Game::blackKingPos = {4, 0};
 // Chessboard
 // 0,0  1,0  2,0  3,0  4,0  5,0  6,0  7,0
 //
@@ -67,6 +69,7 @@ bool Game::isPathClear(int fromX, int fromY, int toX, int toY) {
 }
 
 bool Game::isLegalMove(Piece* piece, int fromX, int fromY, int toX, int toY) {
+  if (fromX == toX && fromY == toY) return false;
   if (!piece->isValidMove(toX, toY)) return false;
   if (dynamic_cast<Knight*>(piece) == nullptr && !isPathClear(fromX, fromY, toX, toY)) return false;
 
@@ -77,11 +80,53 @@ bool Game::isLegalMove(Piece* piece, int fromX, int fromY, int toX, int toY) {
   if (target) {
     if (target->getColor() == piece->getColor()) return false;
     if (isPawn && !isDiagonal) return false;
-    return true;
+  } else {
+    if (isPawn && isDiagonal) return false;
   }
 
-  if (isPawn && isDiagonal) return false;
+  if (wouldLeaveKingInCheck(piece, fromX, fromY, toX, toY)) return false;
   return true;
+}
+
+std::pair<int, int> Game::getKingPosition(bool color) {
+  return color == WHITE ? whiteKingPos : blackKingPos;
+}
+
+bool Game::isSquareUnderAttack(int x, int y, bool byColor) {
+  for (const auto& entry : board) {
+    Piece* p = entry.second;
+    if (!p || p->getColor() != byColor) continue;
+    
+    int fromX = entry.first.first;
+    int fromY = entry.first.second;
+    
+    if (p->isValidMove(x, y)) {
+      if (dynamic_cast<Knight*>(p)) return true;
+      if (isPathClear(fromX, fromY, x, y)) return true;
+    }
+  }
+  return false;
+}
+
+bool Game::wouldLeaveKingInCheck(Piece* piece, int fromX, int fromY, int toX, int toY) {
+  Piece* target = board[{toX, toY}];
+  
+  board[{fromX, fromY}] = nullptr;
+  board[{toX, toY}] = piece;
+  
+  std::pair<int, int> kingPos;
+  if (dynamic_cast<King*>(piece)) {
+    kingPos = {toX, toY};
+  } else {
+    kingPos = getKingPosition(piece->getColor());
+  }
+  
+  bool inCheck = isSquareUnderAttack(kingPos.first, kingPos.second, !piece->getColor());
+  
+  board[{fromX, fromY}] = piece;
+  board[{toX, toY}] = target;
+  
+  return inCheck;
 }
 
 void Game::undoLastMove() {
@@ -96,6 +141,15 @@ void Game::undoLastMove() {
   if (lastMove.captured) {
     board[{lastMove.toX, lastMove.toY}] = lastMove.captured;
     lastMove.captured->move(lastMove.toX, lastMove.toY);
+  }
+
+  // Revert king position if king moved
+  if (dynamic_cast<King*>(lastMove.piece)) {
+    if (lastMove.piece->getColor() == WHITE) {
+      whiteKingPos = {lastMove.fromX, lastMove.fromY};
+    } else {
+      blackKingPos = {lastMove.fromX, lastMove.fromY};
+    }
   }
 
   toggleTurn();
@@ -197,6 +251,14 @@ void Game::handleEvents() {
         piece->move(newX, newY);
         if (target) {
           board[{newX, newY}] = piece;
+        }
+        // Update king position if king moved
+        if (dynamic_cast<King*>(piece)) {
+          if (piece->getColor() == WHITE) {
+            whiteKingPos = {newX, newY};
+          } else {
+            blackKingPos = {newX, newY};
+          }
         }
         moveHistory.push_back(move);
         toggleTurn();
