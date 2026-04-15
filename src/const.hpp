@@ -12,6 +12,8 @@ const int SQUARE_SIZE = WINDOW_WIDTH / CHESSBOARD_SIZE;
 const int PIECE_SIZE = SQUARE_SIZE;
 const SDL_Color lightColor = {240, 240, 220, 255};
 const SDL_Color darkColor = {139, 69, 19, 255};
+const SDL_Color moveColor = {0, 255, 0, 100};
+const SDL_Color captureColor = {255, 0, 0, 100};
 
 // Assets Paths
 const std::string ASSETS_PATH = "../assets/";

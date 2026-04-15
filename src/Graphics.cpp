@@ -19,6 +19,17 @@ SDL_Texture* Graphics::getTexture(const Piece &piece) {
   return texture;
 }
 
+void Graphics::drawHighlightSquare(int boardX, int boardY, SDL_Color color) {
+  SDL_Rect square;
+  square.x = boardX * SQUARE_SIZE;
+  square.y = boardY * SQUARE_SIZE;
+  square.w = SQUARE_SIZE;
+  square.h = SQUARE_SIZE;
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+  SDL_RenderFillRect(renderer, &square);
+}
+
 void Graphics::drawChessBoard(void) {
   bool isLight = true;
   SDL_Rect square;

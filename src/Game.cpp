@@ -1,4 +1,6 @@
 #include <map>
+#include <vector>
+#include <algorithm>
 
 #include "Game.hpp"
 #include "Graphics.hpp"
@@ -12,6 +14,7 @@ SDL_Event Game::m_event;
 bool Game::m_isRunning = false;
 bool Game::turn = WHITE;
 Piece* Game::draggingPiece = nullptr;
+std::vector<std::pair<int,int>> Game::highlightedMoves;
 // Chessboard
 // 0,0  1,0  2,0  3,0  4,0  5,0  6,0  7,0
 //
@@ -46,6 +49,39 @@ std::map<std::pair<int, int>, Piece *> Game::board = {
     {{7, 0}, nullptr}, {{7, 1}, nullptr}, {{7, 2}, nullptr}, {{7, 3}, nullptr},
     {{7, 4}, nullptr}, {{7, 5}, nullptr}, {{7, 6}, nullptr}, {{7, 7}, nullptr},
 };
+
+bool Game::isPathClear(int fromX, int fromY, int toX, int toY) {
+  int dx = toX - fromX;
+  int dy = toY - fromY;
+  int steps = std::max(std::abs(dx), std::abs(dy));
+  if (steps <= 1) return true; // adjacent or same, no path to check
+  int stepX = dx / steps;
+  int stepY = dy / steps;
+  for (int i = 1; i < steps; ++i) {
+    int checkX = fromX + i * stepX;
+    int checkY = fromY + i * stepY;
+    if (board[{checkX, checkY}] != nullptr) return false;
+  }
+  return true;
+}
+
+bool Game::isLegalMove(Piece* piece, int fromX, int fromY, int toX, int toY) {
+  if (!piece->isValidMove(toX, toY)) return false;
+  if (dynamic_cast<Knight*>(piece) == nullptr && !isPathClear(fromX, fromY, toX, toY)) return false;
+
+  Piece* target = board[{toX, toY}];
+  bool isPawn = dynamic_cast<Pawn*>(piece) != nullptr;
+  bool isDiagonal = std::abs(toX - fromX) == 1 && std::abs(toY - fromY) == 1;
+
+  if (target) {
+    if (target->getColor() == piece->getColor()) return false;
+    if (isPawn && !isDiagonal) return false;
+    return true;
+  }
+
+  if (isPawn && isDiagonal) return false;
+  return true;
+}
 
 bool Game::init() {
   m_isRunning = true;
@@ -108,6 +144,14 @@ void Game::handleEvents() {
           oldY = boardY;
           offsetX = mouseX - piece->body.x;
           offsetY = mouseY - piece->body.y;
+          highlightedMoves.clear();
+          for (int x = 0; x < CHESSBOARD_SIZE; ++x) {
+            for (int y = 0; y < CHESSBOARD_SIZE; ++y) {
+              if (isLegalMove(piece, oldX, oldY, x, y)) {
+                highlightedMoves.emplace_back(x, y);
+              }
+            }
+          }
           isDragging = true;
           draggingPiece = piece;
         }
@@ -120,28 +164,52 @@ void Game::handleEvents() {
       SDL_GetMouseState(&mouseX, &mouseY);
       int newX = mouseX / SQUARE_SIZE;
       int newY = mouseY / SQUARE_SIZE;
-      if (newX >= 0 && newX < CHESSBOARD_SIZE && newY >= 0 && newY < CHESSBOARD_SIZE && piece->isValidMove(newX, newY)) {
-        // TODO Add move validation here (e.g., isValidMove(piece, oldX, oldY, newX, newY))
+      if (newX >= 0 && newX < CHESSBOARD_SIZE && newY >= 0 && newY < CHESSBOARD_SIZE && piece->isValidMove(newX, newY) && (dynamic_cast<Knight*>(piece) || isPathClear(oldX, oldY, newX, newY))) {
         Piece *target = board[{newX, newY}];
-        if (target && (target->getColor() != piece->getColor())) 
-          delete target;
-        else if (target) {
+        bool isPawn = dynamic_cast<Pawn*>(piece) != nullptr;
+        bool isDiagonal = std::abs(newX - oldX) == 1 && std::abs(newY - oldY) == 1;
+        bool isForward = (newX - oldX) == 0;
+        bool validMove = false;
+        if (target) {
+          if (target->getColor() == piece->getColor()) {
+            // can't capture own piece
+            validMove = false;
+          } else {
+            // enemy piece
+            if (isPawn && !isDiagonal) {
+              // pawn can't capture forward
+              validMove = false;
+            } else {
+              // valid capture
+              delete target;
+              validMove = true;
+            }
+          }
+        } else {
+          // empty square
+          if (isPawn && isDiagonal) {
+            // pawn can't move diagonal to empty
+            validMove = false;
+          } else {
+            // valid move to empty
+            validMove = true;
+          }
+        }
+        if (validMove) {
+          board[{newX, newY}] = piece;
+          piece->move(newX, newY);
+          toggleTurn();
+        } else {
           // Invalid move: return to original position
           board[{oldX, oldY}] = piece;
           piece->move(oldX, oldY);
-          isDragging = false;
-          piece = nullptr;
-          draggingPiece = nullptr;
-          break;
         }
-        board[{newX, newY}] = piece;
-        piece->move(newX, newY);
-        toggleTurn();
       } else {
         // Invalid drop: return to original position
         board[{oldX, oldY}] = piece;
         piece->move(oldX, oldY);
       }
+      highlightedMoves.clear();
       isDragging = false;
       piece = nullptr;
       draggingPiece = nullptr;
@@ -162,6 +230,11 @@ void Game::handleEvents() {
 void Game::update() {
   Graphics::clear();
   Graphics::drawChessBoard();
+  for (const auto& coord : highlightedMoves) {
+    Piece* target = board[{coord.first, coord.second}];
+    Graphics::drawHighlightSquare(coord.first, coord.second,
+      target ? captureColor : moveColor);
+  }
   for (const auto& entry : board) {
     if (entry.second != nullptr) {
       Graphics::drawPiece(*entry.second);
@@ -181,6 +254,9 @@ bool Game::isRunning() {
 void Game::shutdown() {
   for (const auto& entry : board) {
     delete entry.second;
+  }
+  if (draggingPiece) {
+    delete draggingPiece;
   }
   Graphics::cleanup();
 }

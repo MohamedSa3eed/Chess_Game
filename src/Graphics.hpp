@@ -9,6 +9,7 @@ class Graphics {
     static void clear(void);
     static void present(void);
     static SDL_Texture* getTexture(const Piece &piece);
+    static void drawHighlightSquare(int boardX, int boardY, SDL_Color color);
     static bool init(void);
     static void cleanup(void);
     static Graphics& getInstance(void);
