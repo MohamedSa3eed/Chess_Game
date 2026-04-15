@@ -20,7 +20,17 @@ class Game
     static bool isRunning(void);
 
   private:
+    struct MoveRecord {
+      Piece* piece;
+      int fromX;
+      int fromY;
+      int toX;
+      int toY;
+      Piece* captured;
+    };
+
     static std::vector<std::pair<int,int>> highlightedMoves;
+    static std::vector<MoveRecord> moveHistory;
     static bool m_isRunning;
     static SDL_Event m_event;
     static bool turn;
@@ -28,6 +38,7 @@ class Game
 
     static void toggleTurn(void);
     static void handleEvents(void);
+    static void undoLastMove(void);
     static bool isPathClear(int fromX, int fromY, int toX, int toY);
     static bool isLegalMove(Piece* piece, int fromX, int fromY, int toX, int toY);
 };
