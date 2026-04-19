@@ -28,6 +28,8 @@ class Game
       int toY;
       Piece* captured;
       bool isCastling = false;
+      bool isPromotion = false;
+      Piece* originalPawn = nullptr;
       Piece* castlingRook = nullptr;
       int castlingRookFromX = -1;
       int castlingRookFromY = -1;
@@ -54,4 +56,12 @@ class Game
     static std::pair<int, int> getKingPosition(bool color);
     static bool isCastlingLegal(Piece* piece, int fromX, int fromY, int toX, int toY, Piece*& outRook, int& outRookFromX, int& outRookFromY, int& outRookToX, int& outRookToY);
     static void executeCastling(Piece* piece, int toX, int toY, Piece* rook, int rookFromX, int rookFromY, int rookToX, int rookToY);
+    static char requestPromotionChoice(bool color);
+    static Piece* createPromotionPiece(bool color, char choice);
+    static bool promotionPending;
+    static int promotionFromX;
+    static int promotionFromY;
+    static int promotionToX;
+    static int promotionToY;
+    static Piece* promotionPawn;
 };

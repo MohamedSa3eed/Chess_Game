@@ -1,6 +1,7 @@
 #include <map>
 #include <vector>
 #include <algorithm>
+#include <set>
 
 #include "Game.hpp"
 #include "Graphics.hpp"
@@ -14,6 +15,12 @@ SDL_Event Game::m_event;
 bool Game::m_isRunning = false;
 bool Game::turn = WHITE;
 Piece* Game::draggingPiece = nullptr;
+bool Game::promotionPending = false;
+int Game::promotionFromX = -1;
+int Game::promotionFromY = -1;
+int Game::promotionToX = -1;
+int Game::promotionToY = -1;
+Piece* Game::promotionPawn = nullptr;
 std::vector<std::pair<int,int>> Game::highlightedMoves;
 std::vector<Game::MoveRecord> Game::moveHistory;
 std::pair<int, int> Game::whiteKingPos = WHITE_KING_POSITION;
@@ -140,6 +147,39 @@ bool Game::wouldLeaveKingInCheck(Piece* piece, int fromX, int fromY, int toX, in
   return inCheck;
 }
 
+char Game::requestPromotionChoice(bool color) {
+  const char* message = "Pawn promotion! Press Q for Queen, R for Rook, B for Bishop, N for Knight.";
+  SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Pawn Promotion", message, nullptr);
+  SDL_Event event;
+  while (SDL_WaitEvent(&event)) {
+    if (event.type == SDL_KEYDOWN) {
+      SDL_Keycode k = event.key.keysym.sym;
+      switch (k) {
+        case SDLK_q: return 'q';
+        case SDLK_r: return 'r';
+        case SDLK_b: return 'b';
+        case SDLK_n: return 'n';
+        default: break;
+      }
+    } else if (event.type == SDL_QUIT) {
+      m_isRunning = false;
+      return 'q';
+    }
+  }
+  return 'q';
+}
+
+Piece* Game::createPromotionPiece(bool color, char choice) {
+  switch (choice) {
+    case 'r': return new Rook(color, LEFT);
+    case 'b': return new Bishop(color, LEFT);
+    case 'n': return new Knight(color, LEFT);
+    case 'q':
+    default:
+      return new Queen(color);
+  }
+}
+
 void Game::undoLastMove() {
   if (moveHistory.empty()) return;
   MoveRecord lastMove = moveHistory.back();
@@ -157,6 +197,16 @@ void Game::undoLastMove() {
     board[{lastMove.castlingRookFromX, lastMove.castlingRookFromY}] = lastMove.castlingRook;
     lastMove.castlingRook->move(lastMove.castlingRookFromX, lastMove.castlingRookFromY);
     lastMove.castlingRook->setHasMoved(false);
+  } else if (lastMove.isPromotion) {
+    // Undo promotion: remove queen and restore pawn
+    board[{lastMove.toX, lastMove.toY}] = nullptr;
+    if (lastMove.captured) {
+      board[{lastMove.toX, lastMove.toY}] = lastMove.captured;
+      lastMove.captured->move(lastMove.toX, lastMove.toY);
+    }
+    board[{lastMove.fromX, lastMove.fromY}] = lastMove.originalPawn;
+    lastMove.originalPawn->spawn(lastMove.fromX * SQUARE_SIZE, lastMove.fromY * SQUARE_SIZE);
+    delete lastMove.piece;
   } else {
     // Undo regular move
     board[{lastMove.toX, lastMove.toY}] = nullptr;
@@ -277,40 +327,59 @@ void Game::handleEvents() {
 
       if (validMove) {
         MoveRecord move = {piece, oldX, oldY, newX, newY, target};
-        
-        // Check if this is a castling move
-        Piece* castlingRook = nullptr;
-        int rookFromX, rookFromY, rookToX, rookToY;
-        if (dynamic_cast<King*>(piece) && isCastlingLegal(piece, oldX, oldY, newX, newY, castlingRook, rookFromX, rookFromY, rookToX, rookToY)) {
-          // Execute castling
-          board[{oldX, oldY}] = nullptr;
-          executeCastling(piece, newX, newY, castlingRook, rookFromX, rookFromY, rookToX, rookToY);
-          
-          // Record castling move
-          move.isCastling = true;
-          move.castlingRook = castlingRook;
-          move.castlingRookFromX = rookFromX;
-          move.castlingRookFromY = rookFromY;
-          move.castlingRookToX = rookToX;
-          move.castlingRookToY = rookToY;
-        } else {
-          // Execute regular move
-          board[{oldX, oldY}] = nullptr;
-          board[{newX, newY}] = piece;
-          piece->move(newX, newY);
-          if (target) {
-            board[{newX, newY}] = piece;
+        Pawn* pawn = dynamic_cast<Pawn*>(piece);
+        bool promotion = false;
+        if (pawn) {
+          if ((pawn->getColor() == WHITE && newY == 0) || (pawn->getColor() == BLACK && newY == 7)) {
+            promotion = true;
           }
-          // Update king position if king moved
-          if (dynamic_cast<King*>(piece)) {
-            if (piece->getColor() == WHITE) {
-              whiteKingPos = {newX, newY};
-            } else {
-              blackKingPos = {newX, newY};
+        }
+
+        if (promotion) {
+          board[{oldX, oldY}] = nullptr;
+          move.isPromotion = true;
+          move.originalPawn = piece;
+
+          char choice = requestPromotionChoice(piece->getColor());
+          Piece* promoted = createPromotionPiece(piece->getColor(), choice);
+          promoted->move(newX, newY);
+          board[{newX, newY}] = promoted;
+          move.piece = promoted;
+        } else {
+          // Check if this is a castling move
+          Piece* castlingRook = nullptr;
+          int rookFromX, rookFromY, rookToX, rookToY;
+          if (dynamic_cast<King*>(piece) && isCastlingLegal(piece, oldX, oldY, newX, newY, castlingRook, rookFromX, rookFromY, rookToX, rookToY)) {
+            // Execute castling
+            board[{oldX, oldY}] = nullptr;
+            executeCastling(piece, newX, newY, castlingRook, rookFromX, rookFromY, rookToX, rookToY);
+            
+            // Record castling move
+            move.isCastling = true;
+            move.castlingRook = castlingRook;
+            move.castlingRookFromX = rookFromX;
+            move.castlingRookFromY = rookFromY;
+            move.castlingRookToX = rookToX;
+            move.castlingRookToY = rookToY;
+          } else {
+            // Execute regular move
+            board[{oldX, oldY}] = nullptr;
+            board[{newX, newY}] = piece;
+            piece->move(newX, newY);
+            if (target) {
+              board[{newX, newY}] = piece;
+            }
+            // Update king position if king moved
+            if (dynamic_cast<King*>(piece)) {
+              if (piece->getColor() == WHITE) {
+                whiteKingPos = {newX, newY};
+              } else {
+                blackKingPos = {newX, newY};
+              }
             }
           }
         }
-        
+
         moveHistory.push_back(move);
         toggleTurn();
       } else {
@@ -366,16 +435,28 @@ bool Game::isRunning() {
 }
 
 void Game::shutdown() {
+  std::set<Piece*> toDelete;
   for (const auto& entry : board) {
-    delete entry.second;
+    if (entry.second) {
+      toDelete.insert(entry.second);
+    }
   }
   for (const auto& record : moveHistory) {
     if (record.captured) {
-      delete record.captured;
+      toDelete.insert(record.captured);
+    }
+    if (record.originalPawn) {
+      toDelete.insert(record.originalPawn);
+    }
+    if (record.isPromotion && record.piece && record.piece != record.originalPawn) {
+      toDelete.insert(record.piece);
     }
   }
   if (draggingPiece) {
-    delete draggingPiece;
+    toDelete.insert(draggingPiece);
+  }
+  for (Piece* piece : toDelete) {
+    delete piece;
   }
   Graphics::cleanup();
 }
