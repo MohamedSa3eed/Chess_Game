@@ -16,8 +16,8 @@ bool Game::turn = WHITE;
 Piece* Game::draggingPiece = nullptr;
 std::vector<std::pair<int,int>> Game::highlightedMoves;
 std::vector<Game::MoveRecord> Game::moveHistory;
-std::pair<int, int> Game::whiteKingPos = {4, 7};
-std::pair<int, int> Game::blackKingPos = {4, 0};
+std::pair<int, int> Game::whiteKingPos = WHITE_KING_POSITION;
+std::pair<int, int> Game::blackKingPos = BLACK_KING_POSITION;
 // Chessboard
 // 0,0  1,0  2,0  3,0  4,0  5,0  6,0  7,0
 //
@@ -70,6 +70,17 @@ bool Game::isPathClear(int fromX, int fromY, int toX, int toY) {
 
 bool Game::isLegalMove(Piece* piece, int fromX, int fromY, int toX, int toY) {
   if (fromX == toX && fromY == toY) return false;
+  
+  // Check for castling if it's a king
+  King* king = dynamic_cast<King*>(piece);
+  if (king) {
+    Piece* dummyRook = nullptr;
+    int dummyRookFromX, dummyRookFromY, dummyRookToX, dummyRookToY;
+    if (isCastlingLegal(piece, fromX, fromY, toX, toY, dummyRook, dummyRookFromX, dummyRookFromY, dummyRookToX, dummyRookToY)) {
+      return true;
+    }
+  }
+  
   if (!piece->isValidMove(toX, toY)) return false;
   if (dynamic_cast<Knight*>(piece) == nullptr && !isPathClear(fromX, fromY, toX, toY)) return false;
 
@@ -134,21 +145,37 @@ void Game::undoLastMove() {
   MoveRecord lastMove = moveHistory.back();
   moveHistory.pop_back();
 
-  board[{lastMove.toX, lastMove.toY}] = nullptr;
-  board[{lastMove.fromX, lastMove.fromY}] = lastMove.piece;
-  lastMove.piece->move(lastMove.fromX, lastMove.fromY);
+  if (lastMove.isCastling) {
+    // Undo castling: move king and rook back to original positions
+    board[{lastMove.toX, lastMove.toY}] = nullptr;
+    board[{lastMove.fromX, lastMove.fromY}] = lastMove.piece;
+    lastMove.piece->move(lastMove.fromX, lastMove.fromY);
+    lastMove.piece->setHasMoved(false);
+    
+    // Move rook back
+    board[{lastMove.castlingRookToX, lastMove.castlingRookToY}] = nullptr;
+    board[{lastMove.castlingRookFromX, lastMove.castlingRookFromY}] = lastMove.castlingRook;
+    lastMove.castlingRook->move(lastMove.castlingRookFromX, lastMove.castlingRookFromY);
+    lastMove.castlingRook->setHasMoved(false);
+  } else {
+    // Undo regular move
+    board[{lastMove.toX, lastMove.toY}] = nullptr;
+    board[{lastMove.fromX, lastMove.fromY}] = lastMove.piece;
+    lastMove.piece->move(lastMove.fromX, lastMove.fromY);
 
-  if (lastMove.captured) {
-    board[{lastMove.toX, lastMove.toY}] = lastMove.captured;
-    lastMove.captured->move(lastMove.toX, lastMove.toY);
-  }
+    if (lastMove.captured) {
+      board[{lastMove.toX, lastMove.toY}] = lastMove.captured;
+      lastMove.captured->move(lastMove.toX, lastMove.toY);
+    }
 
-  // Revert king position if king moved
-  if (dynamic_cast<King*>(lastMove.piece)) {
-    if (lastMove.piece->getColor() == WHITE) {
-      whiteKingPos = {lastMove.fromX, lastMove.fromY};
-    } else {
-      blackKingPos = {lastMove.fromX, lastMove.fromY};
+    // Revert king position if king moved
+    if (dynamic_cast<King*>(lastMove.piece)) {
+      if (lastMove.piece->getColor() == WHITE) {
+        whiteKingPos = {lastMove.fromX, lastMove.fromY};
+      } else {
+        blackKingPos = {lastMove.fromX, lastMove.fromY};
+      }
+      lastMove.piece->setHasMoved(false);
     }
   }
 
@@ -212,12 +239,13 @@ void Game::handleEvents() {
       if (boardX >= 0 && boardX < CHESSBOARD_SIZE && boardY >= 0 && boardY < CHESSBOARD_SIZE) {
         piece = board[{boardX, boardY}];
         if (piece && piece->getColor() == turn) {
-          board[{boardX, boardY}] = nullptr;
           oldX = boardX;
           oldY = boardY;
           offsetX = mouseX - piece->body.x;
           offsetY = mouseY - piece->body.y;
           highlightedMoves.clear();
+          
+          // Keep piece on board temporarily while calculating legal moves
           for (int x = 0; x < CHESSBOARD_SIZE; ++x) {
             for (int y = 0; y < CHESSBOARD_SIZE; ++y) {
               if (isLegalMove(piece, oldX, oldY, x, y)) {
@@ -225,6 +253,9 @@ void Game::handleEvents() {
               }
             }
           }
+          
+          // Now remove the piece from board for dragging
+          board[{boardX, boardY}] = nullptr;
           isDragging = true;
           draggingPiece = piece;
         }
@@ -246,25 +277,45 @@ void Game::handleEvents() {
 
       if (validMove) {
         MoveRecord move = {piece, oldX, oldY, newX, newY, target};
-        board[{oldX, oldY}] = nullptr;
-        board[{newX, newY}] = piece;
-        piece->move(newX, newY);
-        if (target) {
+        
+        // Check if this is a castling move
+        Piece* castlingRook = nullptr;
+        int rookFromX, rookFromY, rookToX, rookToY;
+        if (dynamic_cast<King*>(piece) && isCastlingLegal(piece, oldX, oldY, newX, newY, castlingRook, rookFromX, rookFromY, rookToX, rookToY)) {
+          // Execute castling
+          board[{oldX, oldY}] = nullptr;
+          executeCastling(piece, newX, newY, castlingRook, rookFromX, rookFromY, rookToX, rookToY);
+          
+          // Record castling move
+          move.isCastling = true;
+          move.castlingRook = castlingRook;
+          move.castlingRookFromX = rookFromX;
+          move.castlingRookFromY = rookFromY;
+          move.castlingRookToX = rookToX;
+          move.castlingRookToY = rookToY;
+        } else {
+          // Execute regular move
+          board[{oldX, oldY}] = nullptr;
           board[{newX, newY}] = piece;
-        }
-        // Update king position if king moved
-        if (dynamic_cast<King*>(piece)) {
-          if (piece->getColor() == WHITE) {
-            whiteKingPos = {newX, newY};
-          } else {
-            blackKingPos = {newX, newY};
+          piece->move(newX, newY);
+          if (target) {
+            board[{newX, newY}] = piece;
+          }
+          // Update king position if king moved
+          if (dynamic_cast<King*>(piece)) {
+            if (piece->getColor() == WHITE) {
+              whiteKingPos = {newX, newY};
+            } else {
+              blackKingPos = {newX, newY};
+            }
           }
         }
+        
         moveHistory.push_back(move);
         toggleTurn();
       } else {
         board[{oldX, oldY}] = piece;
-        piece->move(oldX, oldY);
+        piece->spawn(oldX * SQUARE_SIZE, oldY * SQUARE_SIZE);
       }
 
       highlightedMoves.clear();
@@ -327,6 +378,68 @@ void Game::shutdown() {
     delete draggingPiece;
   }
   Graphics::cleanup();
+}
+
+bool Game::isCastlingLegal(Piece* piece, int fromX, int fromY, int toX, int toY, Piece*& outRook, int& outRookFromX, int& outRookFromY, int& outRookToX, int& outRookToY) {
+  // Castling must be done by the king
+  King* king = dynamic_cast<King*>(piece);
+  if (!king || king->hasMoved()) return false;
+  
+  // King must move exactly 2 squares horizontally
+  if (fromY != toY || std::abs(toX - fromX) != 2) return false;
+  
+  // King cannot be in check
+  if (isSquareUnderAttack(fromX, fromY, !piece->getColor())) return false;
+  
+  // Determine which rook (kingside or queenside)
+  int rookX = (toX > fromX) ? 7 : 0;  // 7 for kingside, 0 for queenside
+  int rookY = fromY;
+  
+  Piece* rook = board[{rookX, rookY}];
+  if (!rook) return false;
+  
+  Rook* castlingRook = dynamic_cast<Rook*>(rook);
+  if (!castlingRook || castlingRook->getColor() != piece->getColor() || castlingRook->hasMoved()) return false;
+  
+  // All squares between king and rook must be empty
+  int minX = std::min(fromX, rookX);
+  int maxX = std::max(fromX, rookX);
+  for (int x = minX + 1; x < maxX; ++x) {
+    if (board[{x, fromY}] != nullptr) return false;
+  }
+  
+  // New king position square must not be under attack
+  if (isSquareUnderAttack(toX, toY, !piece->getColor())) return false;
+  
+  // Square the king passes through must not be under attack
+  int passedSquareX = (toX > fromX) ? fromX + 1 : fromX - 1;
+  if (isSquareUnderAttack(passedSquareX, fromY, !piece->getColor())) return false;
+  
+  // Set output values
+  outRook = rook;
+  outRookFromX = rookX;
+  outRookFromY = rookY;
+  outRookToX = (toX > fromX) ? 5 : 3;  // 5 for kingside, 3 for queenside
+  outRookToY = rookY;
+  
+  return true;
+}
+
+void Game::executeCastling(Piece* piece, int toX, int toY, Piece* rook, int rookFromX, int rookFromY, int rookToX, int rookToY) {
+  // Move king and rook
+  board[{toX, toY}] = piece;
+  piece->move(toX, toY);
+  
+  board[{rookFromX, rookFromY}] = nullptr;
+  board[{rookToX, rookToY}] = rook;
+  rook->move(rookToX, rookToY);
+  
+  // Update king position
+  if (piece->getColor() == WHITE) {
+    whiteKingPos = {toX, toY};
+  } else {
+    blackKingPos = {toX, toY};
+  }
 }
 
 void Game::toggleTurn() {

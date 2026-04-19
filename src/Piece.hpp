@@ -25,8 +25,13 @@ class Piece {
     bool m_color;
     int m_xPos;
     int m_yPos;
+    bool m_hasMoved = false;
 
   private:
+
+  public:
+    bool hasMoved(void);
+    void setHasMoved(bool moved);
 
 };
 

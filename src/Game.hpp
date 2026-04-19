@@ -27,6 +27,12 @@ class Game
       int toX;
       int toY;
       Piece* captured;
+      bool isCastling = false;
+      Piece* castlingRook = nullptr;
+      int castlingRookFromX = -1;
+      int castlingRookFromY = -1;
+      int castlingRookToX = -1;
+      int castlingRookToY = -1;
     };
 
     static std::vector<std::pair<int,int>> highlightedMoves;
@@ -46,4 +52,6 @@ class Game
     static bool isSquareUnderAttack(int x, int y, bool byColor);
     static bool wouldLeaveKingInCheck(Piece* piece, int fromX, int fromY, int toX, int toY);
     static std::pair<int, int> getKingPosition(bool color);
+    static bool isCastlingLegal(Piece* piece, int fromX, int fromY, int toX, int toY, Piece*& outRook, int& outRookFromX, int& outRookFromY, int& outRookToX, int& outRookToY);
+    static void executeCastling(Piece* piece, int toX, int toY, Piece* rook, int rookFromX, int rookFromY, int rookToX, int rookToY);
 };

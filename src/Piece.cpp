@@ -5,7 +5,7 @@
 #include "Piece.hpp"
 
 Piece::Piece(bool color) 
-    : m_color(color) {
+    : m_color(color), m_hasMoved(false) {
   m_isAlive = true;
 }
 
@@ -26,7 +26,17 @@ void Piece::move(int x, int y) {
     m_xPos = x;
     m_yPos = y;
     spawn(x*SQUARE_SIZE, y*SQUARE_SIZE);
+    m_hasMoved = true;
 }
+
+bool Piece::hasMoved(void) {
+  return m_hasMoved;
+}
+
+void Piece::setHasMoved(bool moved) {
+  m_hasMoved = moved;
+}
+
 
 // #########################################################
 
