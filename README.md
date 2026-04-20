@@ -1,4 +1,4 @@
-# Chess Project
+# Chess Game
 
 ## Overview
 A chess game implementation in C++ with board management, move validation, game logic, and SDL2-based graphics.
@@ -14,8 +14,8 @@ A chess game implementation in C++ with board management, move validation, game 
 ## Installation
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
-   cd Chess
+   git clone https://github.com/MohamedSa3eed/Chess_Game.git
+   cd Chess_Game
    ```
 
 2. Install dependencies:
